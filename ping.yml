@@ -4,6 +4,10 @@
   gather_facts: no
 
   tasks:
+    - name: Print message
+      ansible.builtin.debug:
+        msg: "HELLO FROM SEMAPHORE"
+      
     - name: Ping localhost
       ansible.builtin.ping:
 
