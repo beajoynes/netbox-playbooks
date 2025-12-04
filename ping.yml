@@ -1,0 +1,12 @@
+---
+- name: Test Semaphore Ansible runner
+  hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Ping localhost
+      ansible.builtin.ping:
+
+    - name: Print success message
+      ansible.builtin.debug:
+        msg: "Semaphore Ansible run OK"
