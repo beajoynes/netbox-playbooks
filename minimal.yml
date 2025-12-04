@@ -1,0 +1,17 @@
+---
+- name: Test NetBox lookup via Semaphore
+  hosts: localhost
+  gather_facts: no
+
+  vars:
+    netbox_url: "{{ lookup('ansible.builtin.env', 'NETBOX_API') }}"
+    netbox_token: "{{ lookup('ansible.builtin.env', 'NETBOX_TOKEN') }}"
+
+  tasks:
+    - name: Show env vars
+      debug:
+        msg: "URL={{ netbox_url }}, TOKEN_SET={{ netbox_token is defined and netbox_token|length > 0 }}"
+
+    - name: Query NetBox sites
+      debug:
+        var: "{{ query('netbox.netbox.nb_lookup', 'sites', api_endpoint=netbox_url, token=netbox_token) }}"
