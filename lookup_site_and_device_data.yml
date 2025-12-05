@@ -20,7 +20,7 @@
 
   - name: "Query NetBox for devices at the Almondsbury Site"
     set_fact:
-      devices: "{{ query('netbox.netbox.nb_lookup', 'devices', api_filter='site=ALMY', api_endpoint=netbox_url>, token=netbox_token) }}"
+      devices: "{{ query('netbox.netbox.nb_lookup', 'devices', api_filter='site=ALMY', api_endpoint=netbox_url, token=netbox_token) }}"
 
   - name: "Print a list of devices at Almondsbury Site"
     debug:
