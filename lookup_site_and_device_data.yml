@@ -10,18 +10,18 @@
 
   tasks:
 
-  - name: "Query NetBox for all sites"
-    set_fact:
-      sites: "{{ query('netbox.netbox.nb_lookup', 'sites', api_endpoint=netbox_url, token=netbox_toke>
+    - name: "Query NetBox for all sites"
+      set_fact:
+        sites: "{{ query('netbox.netbox.nb_lookup', 'sites', api_endpoint=netbox_url, token=netbox_toke>
 
-  - name: "Print the list of sites"
-    debug:
-      msg: "{{ sites | json_query('[*].value.name') }}"
+    - name: "Print the list of sites"
+      debug:
+        msg: "{{ sites | json_query('[*].value.name') }}"
 
-  - name: "Query NetBox for devices at the Almondsbury Site"
-    set_fact:
-      devices: "{{ query('netbox.netbox.nb_lookup', 'devices', api_filter='site=ALMY', api_endpoint=n>
+    - name: "Query NetBox for devices at the Almondsbury Site"
+      set_fact:
+        devices: "{{ query('netbox.netbox.nb_lookup', 'devices', api_filter='site=ALMY', api_endpoint=n>
 
-  - name: "Print a list of devices at Almondsbury Site"
-    debug:
-      msg: "{{ devices | json_query('[*].value.name') }}"
+    - name: "Print a list of devices at Almondsbury Site"
+      debug:
+        msg: "{{ devices | json_query('[*].value.name') }}"
