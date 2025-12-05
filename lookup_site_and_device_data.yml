@@ -12,7 +12,7 @@
 
   - name: "Query NetBox for all sites"
     set_fact:
-      sites: "{{ query('netbox.netbox.nb_lookup', 'sites', api_endpoint=netbox_url, token=netbox_toke>
+      sites: "{{ query('netbox.netbox.nb_lookup', 'sites', api_endpoint=netbox_url, token=netbox_token>"
 
   - name: "Print the list of sites"
     debug:
