@@ -1,7 +1,7 @@
 ## lookup_site_and_device_data.yml
 ---
 - name: Lookup NetBox Site and Device Data
-  hosts: localhost
+  hosts: all #localhost
   gather_facts: no
 
   vars:
