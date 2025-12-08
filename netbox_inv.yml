@@ -1,5 +1,7 @@
 # NetBox as a dynamic inventory source for ansible
 plugin: netbox.netbox.nb_inventory
+api_endpoint: http://localhost:8000/ #http://172.28.227.204:8000/
+token: 6359cf4bd054e0a0c59fbedc316f938909b18260
 validate_certs: False
 group_by:
  - device_roles
