@@ -1,0 +1,8 @@
+---
+- name: Ping all devices from NetBox
+  hosts: all
+  gather_facts: no
+
+  tasks:
+    - name: Ping each host
+      ansible.builtin.ping:
