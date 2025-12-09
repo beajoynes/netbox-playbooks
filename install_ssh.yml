@@ -1,0 +1,84 @@
+---
+- name: Install and configure OpenSSH on Alpine containers
+  hosts: frr01
+  gather_facts: false
+  # Do NOT use become in containers unless you’ve installed sudo (not recommended)
+  become: false
+
+  vars:
+    ssh_user: beajoynes
+    ssh_public_key_file: /home/beajoynes/.ssh/id_ed25519.pub   # put your pubkey here
+    allow_password_login: false               # set true only for testing
+    root_password: ""                         # e.g., "ChangeMe123!" if you set allow_password_login: true
+
+  pre_tasks:
+    - name: Ensure Python is present (bootstrap) — Alpine
+      # No sudo here; run as root in the container
+      raw: |
+        set -e
+        if ! command -v python3 >/dev/null 2>&1; then
+          apk update && apk add --no-cache python3
+        fi
+      changed_when: false
+
+    - name: Gather facts after Python is installed
+      setup:
+
+  tasks:
+    - name: Install OpenSSH server and bash
+      ansible.builtin.apk:
+        name:
+          - openssh
+          - bash
+        state: present
+        update_cache: true
+
+    - name: Generate SSH host keys if missing
+      ansible.builtin.command: ssh-keygen -A
+      args:
+        creates: /etc/ssh/ssh_host_rsa_key
+
+    - name: Harden sshd_config (key-based auth by default)
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        create: true
+        state: present
+        insertafter: EOF
+      loop:
+        - { regexp: '^#?PermitRootLogin',       line: 'PermitRootLogin prohibit-password' }
+        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication {{ "yes" if allow_password_login else "no" }}' }
+        - { regexp: '^#?ChallengeResponseAuthentication', line: 'ChallengeResponseAuthentication no' }
+        - { regexp: '^#?UsePAM',                line: 'UsePAM no' }
+        - { regexp: '^#?PubkeyAuthentication',  line: 'PubkeyAuthentication yes' }
+        - { regexp: '^#?X11Forwarding',         line: 'X11Forwarding no' }
+        - { regexp: '^#?AllowUsers',            line: 'AllowUsers {{ ssh_user }}' }
+
+    - name: Create SSH user
+      ansible.builtin.user:
+        name: "{{ ssh_user }}"
+        shell: /bin/bash
+        create_home: true
+        state: present
+
+    - name: Install authorized key for SSH user
+      ansible.builtin.authorized_key:
+        user: "{{ ssh_user }}"
+        state: present
+        key: "{{ lookup('file', ssh_public_key_file) }}"
+
+    - name: Optionally set root password (NOT recommended for production)
+      when: allow_password_login and root_password | length > 0
+      ansible.builtin.command: "sh -c 'echo root:{{ root_password | quote }} | chpasswd'"
+
+    - name: Ensure runtime dir exists (Alpine sometimes needs this)
+      ansible.builtin.file:
+        path: /run/sshd
+        state: directory
+        mode: "0755"
+
+    - name: Start sshd (daemonizes by default)
+      ansible.builtin.command: /usr/sbin/sshd
+      register: sshd_start
+      changed_when: sshd_start.rc == 0
