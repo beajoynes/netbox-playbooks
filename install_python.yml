@@ -1,0 +1,110 @@
+---
+- name: Install Python in containers (supports Alpine, Debian/Ubuntu, RHEL/CentOS, Amazon Linux)
+  hosts: frr01
+  gather_facts: false
+  become: false
+
+  vars:
+    ensure_python_alias: true   # create /usr/bin/python -> python3 if missing
+    install_pip: true           # install pip alongside python3
+
+  pre_tasks:
+    - name: Detect OS using /etc/os-release (no Python required)
+      raw: |
+        set -e
+        if [ -f /etc/os-release ]; then
+          . /etc/os-release
+          echo "ID=${ID}"
+          echo "ID_LIKE=${ID_LIKE:-}"
+        else
+          echo "ID="
+          echo "ID_LIKE="
+        fi
+      register: os_release
+      changed_when: false
+
+    - name: Parse OS facts
+      set_fact:
+        os_id: "{{ (os_release.stdout_lines | select('search','^ID=') | list | first | default('ID=')) | regex_replace('^ID=','') }}"
+        os_like: "{{ (os_release.stdout_lines | select('search','^ID_LIKE=') | list | first | default('ID_LIKE=')) | regex_replace('^ID_LIKE=','') }}"
+
+    - name: Show detected OS
+      debug:
+        msg: "Detected OS: id='{{ os_id }}' like='{{ os_like }}'"
+
+  tasks:
+    - name: Install Python on Alpine (apk)
+      when: os_id == 'alpine' or 'alpine' in os_like
+      raw: |
+        set -e
+        apk update
+        apk add --no-cache python3 {{ 'py3-pip' if install_pip else '' }}
+      changed_when: "'install' in (apk_output.stdout | default('')) or 'install' in (apk_output.stderr | default(''))"
+      register: apk_output
+
+    - name: Install Python on Debian/Ubuntu (apt)
+      when: os_id in ['debian','ubuntu'] or ('debian' in os_like or 'ubuntu' in os_like)
+      raw: |
+        set -e
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -y
+        apt-get install -y --no-install-recommends python3 {{ 'python3-pip python3-venv' if install_pip else '' }}
+        apt-get clean
+        rm -rf /var/lib/apt/lists/*
+      changed_when: false
+
+    - name: Install Python on RHEL/CentOS/Fedora (dnf/yum/microdnf)
+      when: os_id in ['rhel','centos','fedora','rocky','almalinux'] or
+            ('rhel' in os_like or 'fedora' in os_like)
+      raw: |
+        set -e
+        if command -v dnf >/dev/null 2>&1; then PM=dnf;
+        elif command -v microdnf >/dev/null 2>&1; then PM=microdnf;
+        else PM=yum; fi
+        case "$PM" in
+          microdnf) microdnf install -y python3 {{ 'python3-pip' if install_pip else '' }} ;;
+          dnf) dnf -y install python3 {{ 'python3-pip' if install_pip else '' }} ;;
+          yum) yum -y install python3 {{ 'python3-pip' if install_pip else '' }} ;;
+        esac
+      changed_when: false
+
+    - name: Install Python on Amazon Linux
+      when: os_id in ['amzn','amazon'] or 'amzn' in os_like
+      raw: |
+        set -e
+        if command -v dnf >/dev/null 2>&1; then
+          dnf -y install python3 {{ 'python3-pip' if install_pip else '' }}
+        else
+          yum -y install python3 {{ 'python3-pip' if install_pip else '' }}
+        fi
+      changed_when: false
+
+    - name: Fallback error if OS not recognized
+      when: os_id not in ['alpine','debian','ubuntu','rhel','centos','fedora','rocky','almalinux','amzn','amazon']
+            and 'alpine' not in os_like
+            and 'debian' not in os_like
+            and 'ubuntu' not in os_like
+            and 'rhel' not in os_like
+            and 'fedora' not in os_like
+            and 'amzn' not in os_like
+      fail:
+        msg: "Unsupported base image. Detected id='{{ os_id }}' like='{{ os_like }}'. Add a task for this OS."
+
+    - name: Ensure /usr/bin/python points to python3 (optional)
+      when: ensure_python_alias
+      raw: |
+        set -e
+        if ! command -v python >/dev/null 2>&1; then
+          if command -v python3 >/dev/null 2>&1; then
+            ln -s "$(command -v python3)" /usr/bin/python
+          fi
+        fi
+      changed_when: false
+
+    - name: Verify installation
+      raw: "python3 --version && { command -v pip3 >/dev/null 2>&1 && pip3 --version || true; }"
+      register: py_ver
+      changed_when: false
+
+    - name: Show versions
+      debug:
