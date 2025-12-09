@@ -1,0 +1,123 @@
+---
+- name: Remove OpenSSH from containers
+  hosts: frr01
+  gather_facts: false
+  become: false
+
+  vars:
+    purge_configs: true      # if true, removes /etc/ssh and package configs (where supported)
+    kill_only_own_sshd: false # set true if you want to only kill pidfile-based sshd (safer, less aggressive)
+
+  pre_tasks:
+    - name: Detect OS via /etc/os-release (works without Python)
+      raw: |
+        set -e
+        if [ -f /etc/os-release ]; then
+          . /etc/os-release
+          echo "ID=${ID}"
+          echo "ID_LIKE=${ID_LIKE:-}"
+        else
+          echo "ID="
+          echo "ID_LIKE="
+        fi
+      register: os_release
+      changed_when: false
+
+    - name: Parse OS facts
+      set_fact:
+        os_id: "{{ (os_release.stdout_lines | select('search','^ID=') | list | first | default('ID=')) | regex_replace('^ID=','') }}"
+        os_like: "{{ (os_release.stdout_lines | select('search','^ID_LIKE=') | list | first | default('ID_LIKE=')) | regex_replace('^ID_LIKE=','') }}"
+
+  tasks:
+    - name: Stop sshd if running (try gently, then force)
+      raw: |
+        set -e
+        # Try graceful stop if pidfile exists
+        if [ -f /run/sshd.pid ]; then
+          kill "$(cat /run/sshd.pid)" 2>/dev/null || true
+          sleep 1
+        fi
+        # Kill known process names if still running
+        if {{ 'false' if kill_only_own_sshd else 'true' }}; then
+          pkill -f '[/]usr/sbin/sshd' 2>/dev/null || true
+          pkill -x sshd 2>/dev/null || true
+        fi
+      changed_when: false
+
+    # --- Alpine ---
+    - name: Remove OpenSSH on Alpine (apk del)
+      when: os_id == 'alpine' or 'alpine' in os_like
+      raw: |
+        set -e
+        if apk info -e openssh >/dev/null 2>&1; then
+          apk del --no-cache openssh || true
+        fi
+        {{ 'rm -rf /etc/ssh /run/sshd || true' if purge_configs else 'mkdir -p /run && rm -f /run/sshd.pid || true' }}
+      changed_when: false
+
+    # --- Debian/Ubuntu ---
+    - name: Remove OpenSSH on Debian/Ubuntu (apt purge)
+      when: os_id in ['debian','ubuntu'] or ('debian' in os_like or 'ubuntu' in os_like)
+      raw: |
+        set -e
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -y || true
+        # remove server and client if present
+        dpkg -s openssh-server >/dev/null 2>&1 && apt-get purge -y openssh-server || true
+        dpkg -s openssh-client >/dev/null 2>&1 && apt-get purge -y openssh-client || true
+        apt-get autoremove -y || true
+        apt-get clean || true
+        {{ 'rm -rf /etc/ssh /run/sshd || true' if purge_configs else 'rm -f /run/sshd.pid || true' }}
+      changed_when: false
+
+    # --- RHEL/CentOS/Fedora/Rocky/Alma ---
+    - name: Remove OpenSSH on RHEL-like (dnf/yum/microdnf remove)
+      when: os_id in ['rhel','centos','fedora','rocky','almalinux'] or ('rhel' in os_like or 'fedora' in os_like)
+      raw: |
+        set -e
+        if command -v dnf >/dev/null 2>&1; then PM=dnf;
+        elif command -v microdnf >/dev/null 2>&1; then PM=microdnf;
+        else PM=yum; fi
+        # remove both server and clients if present
+        case "$PM" in
+          microdnf) microdnf remove -y openssh-server openssh-clients || true ;;
+          dnf)      dnf remove -y openssh-server openssh-clients || true ;;
+          yum)      yum remove -y openssh-server openssh-clients || true ;;
+        esac
+        {{ 'rm -rf /etc/ssh /run/sshd || true' if purge_configs else 'rm -f /run/sshd.pid || true' }}
+      changed_when: false
+
+    # --- Amazon Linux ---
+    - name: Remove OpenSSH on Amazon Linux
+      when: os_id in ['amzn','amazon'] or 'amzn' in os_like
+      raw: |
+        set -e
+        if command -v dnf >/dev/null 2>&1; then
+          dnf remove -y openssh-server openssh-clients || true
+        else
+          yum remove -y openssh-server openssh-clients || true
+        fi
+        {{ 'rm -rf /etc/ssh /run/sshd || true' if purge_configs else 'rm -f /run/sshd.pid || true' }}
+      changed_when: false
+
+    - name: Verify sshd absence and report
+      raw: |
+        set -e
+        if command -v sshd >/dev/null 2>&1; then
+          echo "sshd still present"
+          exit 1
+        else
+          echo "sshd removed or not present"
+        fi
+      register: verify
+      changed_when: false
+
+    - name: Debug verification
+      debug:
+        var: verify.stdout
+
+    - name: Reminder (ports)
+      debug:
+        msg: >
+          If the container was started with -p ...:22, that host port mapping still exists.
+          To remove it, recreate the container without exposing port 22.
