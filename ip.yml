@@ -1,0 +1,73 @@
+
+---
+- name: Get IP address for device "Local Machine" from NetBox
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    netbox_url: "http://172.28.227.204:8000"
+    netbox_token: "dcebd423e17942513f4d864f562b1f1fd123e02c"
+    device_name: "Local Machine"
+    target_ip: "172.28.227.204"
+
+    # Convenience headers for NetBox API
+    netbox_headers:
+      Authorization: "Token {{ netbox_token }}"
+      Accept: "application/json"
+
+  tasks:
+    - name: Look up device by name
+      uri:
+        url: "{{ netbox_url }}/api/dcim/devices/?name={{ device_name | urlencode }}"
+        method: GET
+        headers: "{{ netbox_headers }}"
+        return_content: true
+      register: device_lookup
+
+    - name: Fail if device not found
+      fail:
+        msg: "Device '{{ device_name }}' not found in NetBox."
+      when: device_lookup.json.count | default(0) == 0
+
+    - name: Set device_id fact
+      set_fact:
+        device_id: "{{ device_lookup.json.results[0].id }}"
+
+    - name: Get all IP addresses assigned to this device
+      uri:
+        url: "{{ netbox_url }}/api/ipam/ip-addresses/?device_id={{ device_id }}"
+        method: GET
+        headers: "{{ netbox_headers }}"
+        return_content: true
+      register: ip_list
+
+    - name: Extract only the matching IP (with mask) e.g. 172.28.227.204/20
+      set_fact:
+        matching_address_with_mask: >-
+          {{
+            (ip_list.json.results
+              | selectattr('address', 'defined')
+              | selectattr('address', 'search', '^' ~ target_ip ~ '/')
+              | list
+              | map(attribute='address')) | first | default(None)
+          }}
+
+    - name: Extract just the bare IP (without mask)
+      set_fact:
+        matching_ip: >-
+          {{
+            (matching_address_with_mask is not none)
+            | ternary(matching_address_with_mask.split('/')[0], None)
+          }}
+
+    - name: Fail if IP not found on the device
+      fail:
+        msg: "IP {{ target_ip }} not found for device '{{ device_name }}'."
+      when: matching_ip is not string
+
+    - name: Show result
+      debug:
+        msg:
+          - "Device: {{ device_name }} (id={{ device_id }})"
+          - "IP address found: {{ matching_ip }}"
+          - "Full address (CIDR): {{ matching_address_with_mask }}"
