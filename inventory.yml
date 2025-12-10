@@ -1,0 +1,19 @@
+[frr01]
+clab-frr01-PC3 ansible_connection=docker
+clab-frr01-router3 ansible_connection=docker
+clab-frr01-PC2 ansible_connection=docker
+clab-frr01-PC1 ansible_connection=docker
+clab-frr01-router2 ansible_connection=docker
+clab-frr01-router1 ansible_connection=docker
+[tig]
+tig-stack-grafana-1 ansible_connection=docker
+tig-stack-telegraf-1 ansible_connection=docker
+tig-stack-influxdb-1 ansible_connection=docker
+[semaphore]
+semaphoreui-semaphore-1 ansible_connection=docker
+semaphoreui-mysql-1 ansible_connection=docker
+[netbox]
+netbox-docker-plugins-8000-netbox-1 ansible_connection=docker
+netbox-docker-plugins-8000-postgres-1 ansible_connection=docker
+netbox-docker-plugins-8000-redis-cache-1 ansible_connection=docker
+netbox-docker-plugins-8000-redis-1 ansible_connection=docker
