@@ -4,13 +4,13 @@
   gather_facts: no
 
   tasks:
-    - name: Print message
-      ansible.builtin.debug:
-        msg: "HELLO FROM SEMAPHORE"
+  #  - name: Print message
+  #    ansible.builtin.debug:
+  #      msg: "HELLO FROM SEMAPHORE"
       
     - name: Ping hosts #localhost
       ansible.builtin.ping:
 
-    - name: Print success message
-      ansible.builtin.debug:
-        msg: "Semaphore Ansible run OK"
+ #   - name: Print success message
+ #     ansible.builtin.debug:
+ #       msg: "Semaphore Ansible run OK"
