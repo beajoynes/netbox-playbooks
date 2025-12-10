@@ -1,0 +1,6 @@
+clab-frr01-PC3 ansible_host=172.20.0.5 ansible_connection=docker
+clab-frr01-router3 ansible_connection=docker
+clab-frr01-PC2 ansible_connection=docker
+clab-frr01-PC1 ansible_connection=docker
+clab-frr01-router2 ansible_connection=docker
+clab-frr01-router1 ansible_connection=docker
