@@ -1,6 +1,6 @@
 ---
 - name: Install and configure OpenSSH on Alpine containers
-  hosts: all #frr01
+  hosts: frr01
   gather_facts: false
   # Do NOT use become in containers unless you’ve installed sudo (not recommended)
   become: false
