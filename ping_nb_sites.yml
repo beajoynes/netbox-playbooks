@@ -1,6 +1,6 @@
 ---
 - name: Ping all devices from NetBox
-  hosts: all
+  hosts: localhost #all
   gather_facts: no
 
   tasks:
